@@ -456,6 +456,17 @@ async function sendImage(){
   fileInput.value = '';
 }
 
+async function sendVideo(){
+  const fileInput = document.getElementById('videoInput');
+  const file = fileInput.files[0];
+  if(!file || !activeChatId) return;
+
+  if(file.size > MAX_UPLOAD_BYTES){
+    alert('Video must be under 10 MB.');
+    fileInput.value = '';
+    return;
+  }
+
   const parts = file.name.split('.');
   const ext = parts.length > 1 ? parts.pop().toLowerCase() : 'mp4';
   const path = 'chatVideos/' + activeChatId + '/' + Date.now() + '.' + ext;
@@ -727,4 +738,3 @@ document.addEventListener('click', function(e){
     document.getElementById('msgInput').value += e.target.textContent;
   }
 });
-
