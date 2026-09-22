@@ -275,48 +275,82 @@ async function listenToChats(){
 }
 
 async function refreshChatList(){
-  const result = await sb
-    .from('chats')
-    .select('*')
-    .or('member_a.eq.' + currentUser.id + ',member_b.eq.' + currentUser.id)
-    .order('updated_at', { ascending: false });
+    const result = await sb
+      .from('chats')
+      .select('*')
+      .or('member_a.eq.' + currentUser.id + ',member_b.eq.' + currentUser.id)
+      .order('updated_at', { ascending: false });
 
-  const chats = result.data;
-  if(result.error){ console.error('chat list error', result.error); return; }
+    const chats = result.data;
+    if(result.error){ console.error('chat list error', result.error); return; }
 
-  const listEl = document.getElementById('chatList');
-  listEl.innerHTML = '';
+    const listEl = document.getElementById('chatList');
+    listEl.innerHTML = '';
 
-  for(const chat of (chats || [])){
-    const otherUid = chat.member_a === currentUser.id ? chat.member_b : chat.member_a;
+    // Load my contacts so we can hide "+ Add" if already saved
+    const myContactsRes = await sb.from('contacts').select('contact_id').eq('owner_id', currentUser.id);
+    const myContactIds = new Set((myContactsRes.data || []).map(function(c){ return c.contact_id; }));
 
-    const pResult = await sb
-      .from('profiles')
-      .select('display_name, username, business_name, profile_picture_url')
-      .eq('id', otherUid)
-      .maybeSingle();
+    for(const chat of (chats || [])){
+      const otherUid = chat.member_a === currentUser.id ? chat.member_b : chat.member_a;
 
-    const profile = pResult.data;
-    const label = profile
-      ? (profile.display_name || profile.username || profile.business_name || 'Unknown')
-      : 'Unknown';
+      const pResult = await sb
+        .from('profiles')
+        .select('display_name, username, business_name, profile_picture_url')
+        .eq('id', otherUid)
+        .maybeSingle();
 
-    const div = document.createElement('div');
-    div.className = 'contact' + (chat.id === activeChatId ? ' active' : '');
+      const profile = pResult.data;
+      const label = profile
+        ? (profile.display_name || profile.username || profile.business_name || 'Unknown')
+        : 'Unknown';
 
-    let avatarInner;
-    if(profile && profile.profile_picture_url){
-      avatarInner = '<img class="avatar" src="' + profile.profile_picture_url + '" style="object-fit:cover;">';
-    } else {
-      avatarInner = '<div class="avatar">' + label.slice(0,2).toUpperCase() + '</div>';
+      const div = document.createElement('div');
+      div.className = 'contact' + (chat.id === activeChatId ? ' active' : '');
+
+      let avatarInner;
+      if(profile && profile.profile_picture_url){
+        avatarInner = '<img class="avatar" src="' + profile.profile_picture_url + '" style="object-fit:cover;">';
+      } else {
+        avatarInner = '<div class="avatar">' + label.slice(0,2).toUpperCase() + '</div>';
+      }
+
+      const alreadyContact = myContactIds.has(otherUid);
+      const addBtnHtml = alreadyContact ? '' :
+        '<button class="mini-btn chat-add-btn" data-add="' + otherUid + '" style="margin-left:6px;">+ Add</button>';
+
+      div.innerHTML = avatarInner +
+        '<div class="meta" style="flex:1;min-width:0;"><div class="name">' + label + '</div>' +
+        '<div class="last">' + (chat.last_message || '').slice(0,30) + '</div></div>' +
+        addBtnHtml;
+
+      div.onclick = function(ev){
+        if(ev.target && ev.target.dataset && ev.target.dataset.add){ return; }
+        openChat(chat.id, null);
+      };
+
+      // Wire up the Add button
+      const addBtn = div.querySelector('[data-add]');
+      if(addBtn){
+        addBtn.onclick = async function(ev){
+          ev.stopPropagation();
+          const targetUid = addBtn.dataset.add;
+          const ins = await sb.from('contacts').insert({
+            owner_id: currentUser.id,
+            contact_id: targetUid
+          });
+          if(ins.error && ins.error.code !== '23505'){
+            alert('Could not add contact: ' + ins.error.message);
+            return;
+          }
+          addBtn.textContent = '✓';
+          addBtn.disabled = true;
+          if(typeof loadContactsList === 'function') loadContactsList();
+        };
+      }
+
+      listEl.appendChild(div);
     }
-
-    div.innerHTML = avatarInner +
-      '<div class="meta"><div class="name">' + label + '</div>' +
-      '<div class="last">' + (chat.last_message || '').slice(0,30) + '</div></div>';
-
-    div.onclick = function(){ openChat(chat.id, null); };
-    listEl.appendChild(div);
   }
 }
 
@@ -832,13 +866,67 @@ window.addEventListener('load', function(){
    ============================================================ */
 let groupMemberDraft = [];
 
-function openGroupModal(){
+let recentChatPartners = [];
+
+async function openGroupModal(){
   groupMemberDraft = [];
   document.getElementById('groupNameInput').value = '';
   document.getElementById('groupMemberSearch').value = '';
   document.getElementById('groupCreateError').textContent = '';
+
+  // Load recent chat partners to show as suggestions
+  recentChatPartners = [];
+  try {
+    const chatsRes = await sb.from('chats').select('member_a, member_b')
+      .or('member_a.eq.' + currentUser.id + ',member_b.eq.' + currentUser.id);
+    const seen = new Set();
+    const partnerIds = [];
+    (chatsRes.data || []).forEach(function(c){
+      const otherUid = c.member_a === currentUser.id ? c.member_b : c.member_a;
+      if(!seen.has(otherUid)){ seen.add(otherUid); partnerIds.push(otherUid); }
+    });
+    if(partnerIds.length > 0){
+      const profRes = await sb.from('profiles')
+        .select('id, display_name, username, business_name')
+        .in('id', partnerIds);
+      (profRes.data || []).forEach(function(p){
+        const label = p.display_name || p.username || p.business_name || 'Unknown';
+        const handle = p.username || p.business_name || '';
+        recentChatPartners.push({ uid: p.id, label: label, handle: handle });
+      });
+    }
+  } catch(e){ console.error('recent partners load failed', e); }
+
   renderGroupDraft();
+  renderRecentPartnersInGroupModal();
   document.getElementById('groupModalBackdrop').classList.add('show');
+}
+
+function renderRecentPartnersInGroupModal(){
+  const container = document.getElementById('groupRecentList');
+  if(!container) return;
+  if(recentChatPartners.length === 0){
+    container.innerHTML = '<div style="opacity:.5;font-size:.72rem;padding:6px;">No recent chat partners yet.</div>';
+    return;
+  }
+  container.innerHTML = '';
+  recentChatPartners.forEach(function(p){
+    const inDraft = groupMemberDraft.some(function(m){ return m.uid === p.uid; });
+    const row = document.createElement('div');
+    row.className = 'group-draft-row';
+    row.style.cursor = 'pointer';
+    row.innerHTML = '<div class="cavatar">' + (p.label||'?').charAt(0).toUpperCase() + '</div>' +
+      '<div class="dname">' + p.label + ' <small style="opacity:.5;">@' + p.handle + '</small></div>' +
+      (inDraft ? '<span style="color:#3ecf6e;font-size:.7rem;">✓ Added</span>' : '<button class="mini-btn">+ Add</button>');
+    if(!inDraft){
+      row.onclick = function(){
+        groupMemberDraft.push({ uid: p.uid, label: p.label, handle: p.handle });
+        renderGroupDraft();
+        renderRecentPartnersInGroupModal();
+      };
+    }
+    container.appendChild(row);
+  });
 }
 function closeGroupModal(){
   document.getElementById('groupModalBackdrop').classList.remove('show');
@@ -935,3 +1023,5 @@ async function loadGroupList(){
     container.appendChild(row);
   }
 }
+
+

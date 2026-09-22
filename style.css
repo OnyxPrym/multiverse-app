@@ -355,3 +355,16 @@ main{
 }
 .group-row .gname{font-weight:600;font-size:.85rem;}
 .group-row .gmeta{font-size:.65rem;opacity:.6;}
+
+/* ---- CHAT ROW ADD BUTTON ---- */
+.chat-add-btn{
+  flex-shrink:0;
+  font-size:.62rem;
+  padding:4px 8px;
+  white-space:nowrap;
+  align-self:center;
+}
+.chat-add-btn:disabled{
+  opacity:.5;
+  cursor:default;
+}

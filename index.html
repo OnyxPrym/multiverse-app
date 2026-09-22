@@ -186,8 +186,11 @@
         <input type="text" id="groupNameInput" placeholder="e.g. Weekend Crew">
       </div>
       <div class="field">
-        <label>Add members (search by @username)</label>
-        <div style="display:flex;gap:6px;">
+        <label>Recent chat partners</label>
+        <div id="groupRecentList" style="max-height:150px;overflow-y:auto;margin-bottom:8px;"></div>
+      </div>
+      <div class="field">
+        <label>Search by @username</label>        <div style="display:flex;gap:6px;">
           <input type="text" id="groupMemberSearch" placeholder="@username">
           <button type="button" class="mini-btn" onclick="addMemberToGroupDraft()">Add</button>
         </div>
@@ -199,6 +202,7 @@
   </div>
 </body>
 </html>
+
 
 
 
