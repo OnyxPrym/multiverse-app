@@ -1,0 +1,6 @@
+_backup_phase2/
+*.ps1
+firestore.rules
+storage.rules
+README.md
+.DS_Store
