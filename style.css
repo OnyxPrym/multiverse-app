@@ -324,3 +324,34 @@ main{
 }
 .mini-btn.danger{border-color:rgba(229,83,75,.6);color:#e5534b;}
 .contact-empty{padding:8px 14px;opacity:.5;font-size:.72rem;}
+
+/* ---- GROUP CREATE MODAL ---- */
+.modal-backdrop.show{display:flex;}
+.group-draft-row{
+  display:flex;align-items:center;gap:8px;padding:8px 10px;
+  border:1px solid rgba(212,175,55,.25);border-radius:10px;
+  margin-bottom:6px;font-size:.78rem;
+}
+.group-draft-row .cavatar{
+  width:26px;height:26px;border-radius:50%;
+  background:linear-gradient(135deg,var(--gold),#8a6d1a);
+  color:#111;display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:.6rem;flex-shrink:0;
+}
+.group-draft-row .dname{flex:1;}
+.group-draft-row .mini-btn.danger{
+  border-color:rgba(229,83,75,.6);color:#e5534b;
+}
+.group-row{
+  display:flex;gap:10px;align-items:center;padding:10px 14px;
+  border-bottom:1px solid rgba(150,150,150,.15);cursor:pointer;
+}
+.group-row:hover{background:rgba(212,175,55,.12);}
+.group-row .gavatar{
+  width:38px;height:38px;border-radius:50%;
+  background:linear-gradient(135deg,#6f3cff,var(--gold));
+  color:#fff;display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:.85rem;flex-shrink:0;
+}
+.group-row .gname{font-weight:600;font-size:.85rem;}
+.group-row .gmeta{font-size:.65rem;opacity:.6;}

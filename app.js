@@ -825,3 +825,113 @@ window.addEventListener('load', function(){
     if(currentUser && typeof loadContactsList === 'function') loadContactsList();
   }, 1500);
 });
+
+
+/* ============================================================
+   GROUP CREATION
+   ============================================================ */
+let groupMemberDraft = [];
+
+function openGroupModal(){
+  groupMemberDraft = [];
+  document.getElementById('groupNameInput').value = '';
+  document.getElementById('groupMemberSearch').value = '';
+  document.getElementById('groupCreateError').textContent = '';
+  renderGroupDraft();
+  document.getElementById('groupModalBackdrop').classList.add('show');
+}
+function closeGroupModal(){
+  document.getElementById('groupModalBackdrop').classList.remove('show');
+}
+function renderGroupDraft(){
+  const list = document.getElementById('groupMemberDraftList');
+  if(groupMemberDraft.length === 0){
+    list.innerHTML = '<div style="opacity:.5;font-size:.72rem;padding:6px;">No members added yet.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  groupMemberDraft.forEach(function(m, i){
+    const row = document.createElement('div');
+    row.className = 'group-draft-row';
+    row.innerHTML = '<div class="cavatar">' + (m.label||'?').charAt(0).toUpperCase() + '</div>' +
+      '<div class="dname">' + m.label + ' <small style="opacity:.5;">@' + m.handle + '</small></div>';
+    const btn = document.createElement('button');
+    btn.className = 'mini-btn danger';
+    btn.textContent = '✕';
+    btn.onclick = function(){ groupMemberDraft.splice(i,1); renderGroupDraft(); };
+    row.appendChild(btn);
+    list.appendChild(row);
+  });
+}
+async function addMemberToGroupDraft(){
+  const raw = document.getElementById('groupMemberSearch').value.trim().toLowerCase().replace('@','');
+  if(!raw) return;
+  if(groupMemberDraft.some(function(m){ return m.handle === raw; })){
+    document.getElementById('groupMemberSearch').value = '';
+    return;
+  }
+  const res = await sb.from('names').select('uid, name').eq('name', raw).maybeSingle();
+  if(res.error || !res.data){ alert('No user found with that username.'); return; }
+  const uid = res.data.uid;
+  if(uid === currentUser.id){ alert("You are already the owner."); return; }
+
+  const prof = await sb.from('profiles').select('display_name, username, business_name').eq('id', uid).maybeSingle();
+  const p = prof.data || {};
+  const label = p.display_name || p.username || p.business_name || raw;
+  const handle = p.username || p.business_name || raw;
+  groupMemberDraft.push({ uid: uid, label: label, handle: handle });
+  document.getElementById('groupMemberSearch').value = '';
+  renderGroupDraft();
+}
+async function createGroup(){
+  const name = document.getElementById('groupNameInput').value.trim();
+  const err = document.getElementById('groupCreateError');
+  err.textContent = '';
+  if(!name){ err.textContent = 'Group needs a name.'; return; }
+
+  const insGroup = await sb.from('groups').insert({
+    name: name,
+    owner_id: currentUser.id
+  }).select().single();
+
+  if(insGroup.error){ err.textContent = insGroup.error.message; return; }
+  const gid = insGroup.data.id;
+
+  const memberRows = groupMemberDraft.map(function(m){
+    return { group_id: gid, user_id: m.uid, role: 'member', status: 'active' };
+  });
+  if(memberRows.length > 0){
+    const insMembers = await sb.from('group_members').insert(memberRows);
+    if(insMembers.error){ err.textContent = 'Group created but members failed: ' + insMembers.error.message; }
+  }
+
+  closeGroupModal();
+  if(typeof refreshChatList === 'function') refreshChatList();
+  if(typeof loadGroupList === 'function') loadGroupList();
+  alert('Group "' + name + '" created!');
+}
+
+/* ============================================================
+   LOAD GROUP LIST (shows groups you belong to in sidebar)
+   ============================================================ */
+async function loadGroupList(){
+  const container = document.getElementById('groupList');
+  if(!container) return;
+  container.innerHTML = '';
+
+  const memRes = await sb.from('group_members').select('group_id, role').eq('user_id', currentUser.id).eq('status','active');
+  if(memRes.error || !memRes.data || memRes.data.length === 0) return;
+
+  const ids = memRes.data.map(function(r){ return r.group_id; });
+  const gRes = await sb.from('groups').select('id, name, owner_id').in('id', ids);
+  if(gRes.error || !gRes.data) return;
+
+  for(const g of gRes.data){
+    const row = document.createElement('div');
+    row.className = 'group-row';
+    row.innerHTML = '<div class="gavatar">' + g.name.charAt(0).toUpperCase() + '</div>' +
+      '<div><div class="gname">' + g.name + '</div><div class="gmeta">Group</div></div>';
+    row.onclick = function(){ if(typeof openGroupChat === 'function') openGroupChat(g.id, g.name); };
+    container.appendChild(row);
+  }
+}
