@@ -296,6 +296,12 @@ async function refreshChatList(){
   const listEl = document.getElementById('chatList');
   listEl.innerHTML = '';
 
+  let myContactIds = [];
+  try {
+    const cRes = await sb.from('contacts').select('contact_id').eq('owner_id', currentUser.id);
+    myContactIds = (cRes.data || []).map(function(c){ return c.contact_id; });
+  } catch(e){ console.error('contacts load failed', e); }
+
   for(const chat of (chats || [])){
     const otherUid = chat.member_a === currentUser.id ? chat.member_b : chat.member_a;
 
@@ -320,11 +326,45 @@ async function refreshChatList(){
       avatarInner = '<div class="avatar">' + label.slice(0,2).toUpperCase() + '</div>';
     }
 
-    div.innerHTML = avatarInner +
-      '<div class="meta"><div class="name">' + label + '</div>' +
-      '<div class="last">' + (chat.last_message || '').slice(0,30) + '</div></div>';
+    const alreadyContact = myContactIds.indexOf(otherUid) !== -1;
+    const addBtnHtml = alreadyContact
+      ? '<span style="font-size:.62rem;color:#3ecf6e;margin-left:6px;flex-shrink:0;">saved</span>'
+      : '<button class="mini-btn chat-add-btn" data-add="' + otherUid + '" style="margin-left:6px;flex-shrink:0;">+ Add</button>';
 
-    div.onclick = function(){ openChat(chat.id, null); };
+    div.innerHTML = avatarInner +
+      '<div class="meta" style="flex:1;min-width:0;"><div class="name">' + label + '</div>' +
+      '<div class="last">' + (chat.last_message || '').slice(0,30) + '</div></div>' +
+      addBtnHtml;
+
+    div.onclick = function(ev){
+      if(ev.target && ev.target.dataset && ev.target.dataset.add){ return; }
+      openChat(chat.id, null);
+    };
+
+    const addBtn = div.querySelector('[data-add]');
+    if(addBtn){
+      addBtn.onclick = async function(ev){
+        ev.stopPropagation();
+        const targetUid = addBtn.dataset.add;
+        addBtn.disabled = true;
+        addBtn.textContent = '...';
+        const ins = await sb.from('contacts').insert({
+          owner_id: currentUser.id,
+          contact_id: targetUid
+        });
+        if(ins.error && ins.error.code !== '23505'){
+          alert('Could not add: ' + ins.error.message);
+          addBtn.disabled = false;
+          addBtn.textContent = '+ Add';
+          return;
+        }
+        addBtn.textContent = 'saved';
+        addBtn.style.color = '#3ecf6e';
+        addBtn.style.border = 'none';
+        if(typeof loadContactsList === 'function') loadContactsList();
+      };
+    }
+
     listEl.appendChild(div);
   }
 }
@@ -944,6 +984,7 @@ async function loadGroupList(){
     container.appendChild(row);
   }
 }
+
 
 
 
