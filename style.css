@@ -224,3 +224,72 @@ main{
   .composer{padding:8px 12px;}
   .send-btn{width:36px;height:36px;min-width:36px;min-height:36px;}
 }
+
+/* ============================================================
+   FIX: Profile + Log Out buttons overlap on small phones
+   ============================================================ */
+
+/* On phones, stack the two buttons tighter and prevent overlap */
+@media (max-width: 640px){
+  header{
+    flex-wrap: wrap;
+    row-gap: 4px;
+    padding: 8px 10px;
+  }
+
+  /* Put Profile and Log Out on their own row if they don't fit */
+  header > .signup-btn{
+    padding: 5px 8px !important;
+    font-size: 0.6rem !important;
+    margin-left: 4px !important;
+    flex: 0 0 auto;
+  }
+
+  /* Ensure theme toggle doesn't push the buttons around */
+  .theme-toggle{
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
+  /* Prevent buttons from visually stacking on top of each other */
+  header{
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 6px;
+  }
+
+  /* If overflow still happens, hide the theme text and keep icons */
+  .theme-toggle button{
+    padding: 4px 7px;
+    font-size: 0.6rem;
+    white-space: nowrap;
+  }
+}
+
+/* Very narrow phones — move Profile + Log Out to a second row */
+@media (max-width: 420px){
+  header{
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  /* Force theme toggle + buttons to sit on a wrapped second row */
+  .theme-toggle{
+    margin-left: 0 !important;
+    order: 10;
+  }
+
+  header > .signup-btn{
+    order: 11;
+    margin-left: 4px !important;
+    padding: 4px 8px !important;
+    font-size: 0.58rem !important;
+  }
+
+  /* Title gets full width on row 1 */
+  header > div:first-of-type{
+    flex: 1 1 100%;
+    order: 5;
+  }
+}
