@@ -1,4 +1,4 @@
-:root{ --gold:#d4af37; --gold-bright:#f5d576; }
+﻿:root{ --gold:#d4af37; --gold-bright:#f5d576; }
 *{box-sizing:border-box;}
 html,body{height:100%;margin:0;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;}
 body{background-size:cover;background-position:center;background-attachment:fixed;transition:background-image .4s;}
@@ -121,4 +121,106 @@ body[data-theme="black"] .modal{background:#101014;color:#f2e9d8;}
   .sidebar.open{transform:translateX(0);}
 
   .chat-area{margin-left:0;}
+}
+
+/* ============================================================
+   KARANKA — LAYOUT FIXES
+   Prevents overlap, anchors composer at bottom, keeps send button visible
+   ============================================================ */
+
+/* The app shell must fill the viewport and clip children */
+.app-screen{
+  display:flex;
+  flex-direction:column;
+  height:100vh;
+  height:100dvh;
+  overflow:hidden;
+}
+
+/* Header gets a fixed height so main's flex:1 math is reliable */
+header{
+  flex-shrink:0;
+  min-height:56px;
+}
+
+/* main must fill the remaining space and clip */
+main{
+  flex:1 1 auto;
+  min-height:0;
+  overflow:hidden;
+}
+
+/* sidebar scrolls independently */
+.sidebar{
+  overflow-y:auto;
+  min-height:0;
+}
+
+/* chat-area is a strict vertical flex — no overflow out of the box */
+.chat-area{
+  display:flex;
+  flex-direction:column;
+  flex:1 1 auto;
+  min-height:0;
+  min-width:0;
+  overflow:hidden;
+}
+
+/* chat header stays put */
+.chat-header{
+  flex-shrink:0;
+}
+
+/* messages fill remaining space and scroll internally */
+.messages{
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+}
+
+/* composer pinned at the bottom, never clipped, never overlapping */
+.composer{
+  flex-shrink:0;
+  position:relative;
+  z-index:2;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:10px 14px;
+  padding-bottom:calc(10px + env(safe-area-inset-bottom));
+  box-sizing:border-box;
+  width:100%;
+}
+
+/* Send button always fully visible */
+.send-btn{
+  flex-shrink:0;
+  width:40px;
+  height:40px;
+  min-width:40px;
+  min-height:40px;
+}
+
+/* Message input shrinks, never overflows */
+.composer input[type=text]{
+  flex:1 1 auto;
+  min-width:0;
+}
+
+/* Empty-state polish for the messages area */
+.messages:empty::before{
+  content:"No messages yet — say hi 👋";
+  display:block;
+  text-align:center;
+  opacity:.5;
+  margin-top:40px;
+  font-size:.85rem;
+}
+
+/* On small screens, prevent keyboard from pushing composer out */
+@media (max-height:700px){
+  .composer{padding:8px 12px;}
+  .send-btn{width:36px;height:36px;min-width:36px;min-height:36px;}
 }
