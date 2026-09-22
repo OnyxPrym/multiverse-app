@@ -136,7 +136,7 @@ async function loadProfileAndEnterApp(uid){
   setTheme(profile.theme || 'black', false);
 
   document.getElementById('authScreen').style.display = 'none';
-  document.getElementById('appScreen').style.display = 'block';
+  document.getElementById('appScreen').style.display = 'flex';
 
   if(typeof listenToChats === 'function') listenToChats();
   if(typeof loadStatusFeed === 'function') loadStatusFeed();
