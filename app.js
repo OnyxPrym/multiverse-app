@@ -212,9 +212,18 @@ async function saveDisplayName(){
 }
 
 sb.auth.getSession().then(function(result){
-  const session = result.data ? result.data.session : null;
-  if(session && session.user){ loadProfileAndEnterApp(session.user.id); }
-});
+    const session = result.data ? result.data.session : null;
+    if(session && session.user){
+      loadProfileAndEnterApp(session.user.id);
+    } else {
+      document.getElementById('authScreen').style.display = 'flex';
+      document.getElementById('appScreen').style.display = 'none';
+    }
+  }).catch(function(err){
+    console.error('Session check failed:', err);
+    document.getElementById('authScreen').style.display = 'flex';
+    document.getElementById('appScreen').style.display = 'none';
+  });
 
 sb.auth.onAuthStateChange(function(event, session){
   if(event === 'SIGNED_OUT'){
@@ -935,3 +944,6 @@ async function loadGroupList(){
     container.appendChild(row);
   }
 }
+
+
+
