@@ -293,3 +293,34 @@ main{
     order: 5;
   }
 }
+
+/* ---- CONTACTS LIST ---- */
+.section-label{
+  padding:10px 14px 6px;font-size:.62rem;letter-spacing:2px;
+  text-transform:uppercase;color:var(--gold);font-weight:700;opacity:.75;
+  border-top:1px solid rgba(212,175,55,.2);
+}
+#contactsList{max-height:220px;overflow-y:auto;}
+.contact-row{
+  display:flex;align-items:center;gap:8px;padding:8px 14px;
+  border-bottom:1px solid rgba(150,150,150,.1);
+}
+.contact-row .cavatar{
+  width:32px;height:32px;border-radius:50%;
+  background:linear-gradient(135deg,var(--gold),#8a6d1a);
+  color:#111;display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:.7rem;flex-shrink:0;
+}
+.contact-row .cname{
+  flex:1;min-width:0;font-size:.78rem;font-weight:600;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.contact-row .cname small{display:block;opacity:.6;font-weight:400;font-size:.62rem;}
+.contact-actions{display:flex;gap:4px;flex-shrink:0;}
+.mini-btn{
+  border:1px solid rgba(212,175,55,.4);background:transparent;
+  color:var(--gold);border-radius:6px;padding:4px 7px;
+  font-size:.6rem;font-weight:700;cursor:pointer;white-space:nowrap;
+}
+.mini-btn.danger{border-color:rgba(229,83,75,.6);color:#e5534b;}
+.contact-empty{padding:8px 14px;opacity:.5;font-size:.72rem;}

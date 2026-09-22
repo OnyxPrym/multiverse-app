@@ -738,3 +738,90 @@ document.addEventListener('click', function(e){
     document.getElementById('msgInput').value += e.target.textContent;
   }
 });
+
+
+/* ============================================================
+   CONTACTS LIST
+   ============================================================ */
+async function loadContactsList(){
+  const container = document.getElementById('contactsList');
+  if(!container) return;
+  container.innerHTML = '<div class="contact-empty">Loading…</div>';
+
+  const result = await sb
+    .from('contacts')
+    .select('contact_id, created_at')
+    .eq('owner_id', currentUser.id)
+    .order('created_at', { ascending: false });
+
+  if(result.error){
+    container.innerHTML = '<div class="contact-empty" style="color:#e5534b;">Could not load contacts: ' + result.error.message + '</div>';
+    return;
+  }
+
+  const contacts = result.data || [];
+  if(contacts.length === 0){
+    container.innerHTML = '<div class="contact-empty">No contacts yet.</div>';
+    return;
+  }
+
+  const uids = contacts.map(c => c.contact_id);
+  const profResult = await sb
+    .from('profiles')
+    .select('id, display_name, username, business_name')
+    .in('id', uids);
+  const profileMap = {};
+  (profResult.data || []).forEach(p => { profileMap[p.id] = p; });
+
+  container.innerHTML = '';
+  for(const c of contacts){
+    const p = profileMap[c.contact_id] || {};
+    const label = p.display_name || p.username || p.business_name || 'Unknown';
+    const handle = p.username || p.business_name || '';
+
+    const row = document.createElement('div');
+    row.className = 'contact-row';
+    row.innerHTML =
+      '<div class="cavatar">' + label.charAt(0).toUpperCase() + '</div>' +
+      '<div class="cname">' + label + '<small>@' + handle + '</small></div>' +
+      '<div class="contact-actions">' +
+        '<button class="mini-btn" data-act="chat">Chat</button>' +
+        '<button class="mini-btn danger" data-act="del">✕</button>' +
+        '<button class="mini-btn danger" data-act="blk">🚫</button>' +
+      '</div>';
+
+    row.querySelector('[data-act="chat"]').onclick = function(){
+      const nm = document.getElementById('newChatUsername');
+      if(nm && handle){ nm.value = handle; startChatWithUsername(); }
+    };
+
+    row.querySelector('[data-act="del"]').onclick = async function(){
+      if(!confirm('Remove this contact?')) return;
+      const del = await sb.from('contacts').delete()
+        .eq('owner_id', currentUser.id).eq('contact_id', c.contact_id);
+      if(del.error){ alert('Delete failed: ' + del.error.message); return; }
+      await loadContactsList();
+    };
+
+    row.querySelector('[data-act="blk"]').onclick = async function(){
+      if(!confirm('Block this user? They will be removed.')) return;
+      const blk = await sb.from('blocked_users').insert({
+        blocker_id: currentUser.id, blocked_id: c.contact_id
+      });
+      if(blk.error && blk.error.code !== '23505'){ alert('Block failed: ' + blk.error.message); return; }
+      await sb.from('contacts').delete()
+        .eq('owner_id', currentUser.id).eq('contact_id', c.contact_id);
+      await loadContactsList();
+      alert('Blocked.');
+    };
+
+    container.appendChild(row);
+  }
+}
+
+/* Auto-load contacts after login */
+window.addEventListener('load', function(){
+  setTimeout(function(){
+    if(currentUser && typeof loadContactsList === 'function') loadContactsList();
+  }, 1500);
+});
