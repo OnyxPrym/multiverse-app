@@ -996,14 +996,14 @@ async function loadGroupList(){
 /* ============================================================
    GROUP v2 — full feature set
    ============================================================ */
-let activeGroupId = null;
-let activeGroupName = null;
+var activeGroupId = null; window.activeGroupId = null; window.activeGroupId = null; window.activeGroupId = null;
+var activeGroupName = null; window.activeGroupName = null;
 let groupMessagesChannel = null;
 let groupLogoDataUrl = null;
 
 async function openGroupChat(groupId, groupName){
   closeSidebar();
-  activeGroupId = groupId;
+  activeGroupId = groupId; window.activeGroupId = groupId;
   activeGroupName = groupName;
   document.getElementById('chatHeaderName').textContent = groupName;
   const header = document.getElementById('chatHeader');
@@ -1171,7 +1171,7 @@ async function leaveGroup(groupId){
   const res = await sb.from('group_members').delete().eq('group_id', groupId).eq('user_id', currentUser.id);
   if(res.error){ alert('Failed: ' + res.error.message); return; }
   closeGroupSettings();
-  activeGroupId = null;
+  activeGroupId = null; window.activeGroupId = null;
   document.getElementById('chatHeaderName').textContent = 'Select or start a chat';
   const sb2 = document.getElementById('groupSettingsBtn');
   if(sb2) sb2.style.display = 'none';
@@ -1184,7 +1184,7 @@ async function deleteGroupForEveryone(groupId){
   const res = await sb.from('groups').delete().eq('id', groupId);
   if(res.error){ alert('Failed: ' + res.error.message); return; }
   closeGroupSettings();
-  activeGroupId = null;
+  activeGroupId = null; window.activeGroupId = null;
   document.getElementById('chatHeaderName').textContent = 'Select or start a chat';
   const sb2 = document.getElementById('groupSettingsBtn');
   if(sb2) sb2.style.display = 'none';
@@ -1199,5 +1199,7 @@ window.addEventListener('load', function(){
     if(currentUser && typeof loadGroupList === 'function') loadGroupList();
   }, 500);
 });
+
+
 
 
