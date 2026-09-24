@@ -370,6 +370,11 @@ async function refreshChatList(){
 }
 
 async function openChat(chatId, headerNameHint){
+    // CRITICAL: reset group mode when opening a 1-on-1 chat
+    activeGroupId = null;
+    window.activeGroupId = null;
+    const _gsb = document.getElementById('groupSettingsBtn');
+    if(_gsb) _gsb.style.display = 'none';
   closeSidebar();
   activeChatId = chatId;
 
@@ -1002,6 +1007,10 @@ let groupMessagesChannel = null;
 let groupLogoDataUrl = null;
 
 async function openGroupChat(groupId, groupName){
+  // Close any existing 1-on-1 message subscription
+  if(typeof messagesChannel !== 'undefined' && messagesChannel){
+    try { sb.removeChannel(messagesChannel); messagesChannel = null; } catch(e){}
+  }
   closeSidebar();
   activeGroupId = groupId; window.activeGroupId = groupId;
   activeGroupName = groupName;
@@ -1273,6 +1282,8 @@ async function toggleSound(){
 
 // Initialize on load
 initSound();
+
+
 
 
 
