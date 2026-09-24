@@ -6,7 +6,7 @@
 let currentUser = null;
 let currentProfile = null;
 let acctType = 'personal';
-let activeChatId = null;
+let activeChatId = null; window.activeChatId = null;
 let unsubMessages = null;
 let unsubChats = null;
 
@@ -296,6 +296,7 @@ async function refreshChatList(){
   const listEl = document.getElementById('chatList');
   listEl.innerHTML = '';
 
+  // Load my contacts so we can hide "+ Add" if already saved
   let myContactIds = [];
   try {
     const cRes = await sb.from('contacts').select('contact_id').eq('owner_id', currentUser.id);
@@ -318,6 +319,7 @@ async function refreshChatList(){
 
     const div = document.createElement('div');
     div.className = 'contact' + (chat.id === activeChatId ? ' active' : '');
+    div.setAttribute('data-chatid', chat.id);
 
     let avatarInner;
     if(profile && profile.profile_picture_url){
@@ -336,47 +338,49 @@ async function refreshChatList(){
       '<div class="last">' + (chat.last_message || '').slice(0,30) + '</div></div>' +
       addBtnHtml;
 
-    div.onclick = function(ev){
-      if(ev.target && ev.target.dataset && ev.target.dataset.add){ return; }
-      openChat(chat.id, null);
-    };
-
-    const addBtn = div.querySelector('[data-add]');
-    if(addBtn){
-      addBtn.onclick = async function(ev){
-        ev.stopPropagation();
-        const targetUid = addBtn.dataset.add;
-        addBtn.disabled = true;
-        addBtn.textContent = '...';
-        const ins = await sb.from('contacts').insert({
-          owner_id: currentUser.id,
-          contact_id: targetUid
-        });
-        if(ins.error && ins.error.code !== '23505'){
-          alert('Could not add: ' + ins.error.message);
-          addBtn.disabled = false;
-          addBtn.textContent = '+ Add';
-          return;
-        }
-        addBtn.textContent = 'saved';
-        addBtn.style.color = '#3ecf6e';
-        addBtn.style.border = 'none';
-        if(typeof loadContactsList === 'function') loadContactsList();
-      };
-    }
-
     listEl.appendChild(div);
   }
-}
 
+  // Attach event delegation ONCE (after building the list)
+  if(!listEl.dataset.wired){
+    listEl.dataset.wired = '1';
+    listEl.addEventListener('click', function(ev){
+      const addBtn = ev.target.closest('[data-add]');
+      if(addBtn){
+        ev.stopPropagation();
+        const targetUid = addBtn.getAttribute('data-add');
+        addBtn.disabled = true;
+        addBtn.textContent = '...';
+        sb.from('contacts').insert({ owner_id: currentUser.id, contact_id: targetUid }).then(function(ins){
+          if(ins.error && ins.error.code !== '23505'){
+            alert('Could not add: ' + ins.error.message);
+            addBtn.disabled = false;
+            addBtn.textContent = '+ Add';
+            return;
+          }
+          addBtn.textContent = 'saved';
+          addBtn.style.color = '#3ecf6e';
+          addBtn.style.border = 'none';
+          if(typeof loadContactsList === 'function') loadContactsList();
+        });
+        return;
+      }
+      const row = ev.target.closest('[data-chatid]');
+      if(row){
+        const cid = row.getAttribute('data-chatid');
+        if(cid && typeof openChat === 'function') openChat(cid, null);
+      }
+    });
+  }
+}
 async function openChat(chatId, headerNameHint){
-    // CRITICAL: reset group mode when opening a 1-on-1 chat
+    activeChatId = chatId; window.activeChatId = chatId;
+    window.activeChatId = chatId; window.activeChatId = chatId;
     activeGroupId = null;
     window.activeGroupId = null;
     const _gsb = document.getElementById('groupSettingsBtn');
     if(_gsb) _gsb.style.display = 'none';
-  closeSidebar();
-  activeChatId = chatId;
+  try { closeSidebar(); } catch(e){ console.error('closeSidebar failed', e); }
 
   const headerName = document.getElementById('chatHeaderName');
   const headerActions = document.getElementById('chatHeaderActions');
@@ -1282,6 +1286,7 @@ async function toggleSound(){
 
 // Initialize on load
 initSound();
+
 
 
 
