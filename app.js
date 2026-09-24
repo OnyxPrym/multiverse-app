@@ -1447,7 +1447,7 @@ async function uploadVoiceNote(blob){
   
   const url = sb.storage.from('media').getPublicUrl(path).data.publicUrl;
   
-  const row = { sender_id: currentUser.id, content: '', audio_url: url, storage_path: path };
+  const row = { sender_id: currentUser.id, audio_url: url, storage_path: path, content: '' };
   row[idField] = window.activeGroupId || activeChatId;
   
   const ins = await sb.from(table).insert(row);
@@ -1597,6 +1597,7 @@ async function deleteMessageForEveryone(messageId, table, chatField, chatId){
   if(table === 'group_messages') loadGroupMessages(chatId);
   else loadMessages(chatId);
 }
+
 
 
 
