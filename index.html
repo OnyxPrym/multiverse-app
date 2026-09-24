@@ -131,6 +131,10 @@
       </div>
       <div class="field"><label>Display name</label><input type="text" id="profileDisplayName"></div>
       <div class="field"><label>Username</label><input type="text" id="profileUsername" disabled style="opacity:.6;"></div>
+      <div class="field" style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid rgba(212,175,55,.2);border-bottom:1px solid rgba(212,175,55,.2);margin:16px 0;">
+        <label id="soundToggleLabel" style="cursor:pointer;font-size:.85rem;">Sound ON</label>
+        <input type="checkbox" id="soundToggleCheckbox" checked onchange="toggleSound()" style="width:22px;height:22px;accent-color:#d4af37;cursor:pointer;">
+      </div>
       <button class="create-btn" onclick="saveDisplayName()">Save Changes</button>
       <p class="error" id="profileError"></p>
     </div>
@@ -208,6 +212,7 @@
   </div>
 </body>
 </html>
+
 
 
 

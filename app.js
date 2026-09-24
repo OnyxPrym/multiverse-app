@@ -1055,7 +1055,7 @@ async function loadGroupMessages(groupId){
 function subscribeGroupMessages(groupId){
   if(groupMessagesChannel){ sb.removeChannel(groupMessagesChannel); groupMessagesChannel = null; }
   groupMessagesChannel = sb.channel('group-' + groupId)
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages', filter: 'group_id=eq.' + groupId }, function(){ loadGroupMessages(groupId); })
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages', filter: 'group_id=eq.' + groupId }, function(payload){ if(payload.new && payload.new.sender_id !== currentUser.id && typeof playBeep === 'function') playBeep(); loadGroupMessages(groupId); })
     .subscribe();
 }
 
@@ -1201,5 +1201,77 @@ window.addEventListener('load', function(){
 });
 
 
+
+
+
+
+/* ============================================================
+   NOTIFICATION SOUND
+   ============================================================ */
+let soundEnabled = true;
+let notifyAudio = null;
+
+function initSound(){
+  try {
+    notifyAudio = new Audio('assets/notify.wav');
+    notifyAudio.preload = 'auto';
+    notifyAudio.volume = 0.7;
+  } catch(e) {
+    console.log('WAV not available, will use fallback beep');
+    notifyAudio = null;
+  }
+}
+
+function playBeep(){
+  if(!soundEnabled) return;
+  if(notifyAudio){
+    try {
+      notifyAudio.currentTime = 0;
+      notifyAudio.play().catch(function(){ fallbackBeep(); });
+      return;
+    } catch(e) { /* fall through */ }
+  }
+  fallbackBeep();
+}
+
+function fallbackBeep(){
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 880;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.2);
+  } catch(e) { /* silent fail */ }
+}
+
+async function loadSoundPreference(){
+  if(!currentUser) return;
+  const res = await sb.from('profiles').select('sound_enabled').eq('id', currentUser.id).maybeSingle();
+  if(res.data && typeof res.data.sound_enabled === 'boolean'){
+    soundEnabled = res.data.sound_enabled;
+  }
+}
+
+async function toggleSound(){
+  soundEnabled = !soundEnabled;
+  const update = await sb.from('profiles').update({ sound_enabled: soundEnabled }).eq('id', currentUser.id);
+  if(update.error){
+    console.error('Could not save sound setting:', update.error.message);
+  }
+  const label = document.getElementById('soundToggleLabel');
+  if(label) label.textContent = soundEnabled ? 'Sound ON' : 'Sound OFF';
+  const cb = document.getElementById('soundToggleCheckbox');
+  if(cb) cb.checked = soundEnabled;
+  playBeep();
+}
+
+// Initialize on load
+initSound();
 
 
