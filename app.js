@@ -439,6 +439,23 @@ async function loadMessages(chatId){
     div.className = 'bubble ' + (m.sender_id === currentUser.id ? 'out' : 'in');
     div.setAttribute('data-msgid', m.id);
     div.setAttribute('data-sender', m.sender_id);
+    
+    // Build body based on content type
+    let bodyHtml = '';
+    if(m.deleted){ bodyHtml = '<i style="opacity:.6;">This message was deleted</i>'; }
+    else if(m.image_url){ bodyHtml = '<img src="' + m.image_url + '" style="max-width:200px;border-radius:10px;display:block;">'; }
+    else if(m.audio_url){ bodyHtml = '<audio controls src="' + m.audio_url + '" style="max-width:220px;"></audio>'; }
+    else { bodyHtml = (m.content || ''); }
+    
+    const timeHtml = '<div class="time">' + new Date(m.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) + '</div>';
+    div.innerHTML = bodyHtml + timeHtml;
+    
+    // Attach long-press
+    attachLongPress(div, function(){
+      const mediaUrl = m.image_url || m.audio_url || null;
+      const mediaType = m.image_url ? 'image' : (m.audio_url ? 'audio' : null);
+      showMessageMenu(m.id, m.sender_id, 'messages', 'chat_id', activeChatId, mediaUrl, mediaType);
+    });
 
     if(m.expired){
       div.textContent = 'Photo (expired)';
@@ -1073,7 +1090,9 @@ async function loadGroupMessages(groupId){
     }
     
     attachLongPress(div, function(){
-      showMessageMenu(m.id, m.sender_id, 'group_messages', 'group_id', groupId);
+      const mediaUrl = m.image_url || m.audio_url || null;
+      const mediaType = m.image_url ? 'image' : (m.audio_url ? 'audio' : null);
+      showMessageMenu(m.id, m.sender_id, 'group_messages', 'group_id', groupId, mediaUrl, mediaType);
     });
     
     container.appendChild(div);
@@ -1492,33 +1511,77 @@ function attachLongPress(el, callback){
   el.addEventListener('mouseleave', cancel);
 }
 
-function showMessageMenu(messageId, senderId, table, chatField, chatId){
+function showMessageMenu(messageId, senderId, table, chatField, chatId, mediaUrl, mediaType){
   const isMine = senderId === currentUser.id;
+  const hasMedia = !!mediaUrl;
+  
+  let html = '<div class="msg-menu-inner">';
+  if(hasMedia){
+    html += '<button class="msg-menu-btn save" data-act="save">💾 Save to device</button>';
+  }
+  html += '<button class="msg-menu-btn" data-act="me">Delete for me</button>';
+  if(isMine){
+    html += '<button class="msg-menu-btn danger" data-act="all">Delete for everyone</button>';
+  }
+  html += '<button class="msg-menu-btn cancel" data-act="cancel">Cancel</button>';
+  html += '</div>';
+  
   const menu = document.createElement('div');
   menu.className = 'msg-menu';
   menu.id = 'msgMenu';
-  menu.innerHTML = 
-    '<div class="msg-menu-inner">' +
-    '<button class="msg-menu-btn" data-act="me">Delete for me</button>' +
-    (isMine ? '<button class="msg-menu-btn danger" data-act="all">Delete for everyone</button>' : '') +
-    '<button class="msg-menu-btn" data-act="cancel">Cancel</button>' +
-    '</div>';
+  menu.innerHTML = html;
   document.body.appendChild(menu);
   
   menu.querySelectorAll('button').forEach(function(b){
-    b.onclick = function(){
+    b.onclick = function(e){
+      e.stopPropagation();
       const act = b.dataset.act;
       menu.remove();
       if(act === 'cancel') return;
+      if(act === 'save') saveMedia(mediaUrl, mediaType);
       if(act === 'me') deleteMessageForMe(messageId, table, chatField, chatId);
       if(act === 'all') deleteMessageForEveryone(messageId, table, chatField, chatId);
     };
   });
-  setTimeout(function(){
-    document.addEventListener('click', function closeMenu(ev){
-      if(!menu.contains(ev.target)){ menu.remove(); document.removeEventListener('click', closeMenu); }
-    });
-  }, 100);
+  
+  // Tap outside to close
+  menu.addEventListener('click', function(e){
+    if(e.target === menu) menu.remove();
+  });
+}
+
+async function saveMedia(url, type){
+  if(!url) return;
+  try {
+    // Fetch the file as a blob
+    const res = await fetch(url);
+    if(!res.ok){ alert('Could not download'); return; }
+    const blob = await res.blob();
+    
+    // Create an object URL and trigger download
+    const objUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objUrl;
+    
+    // Determine extension
+    let ext = 'bin';
+    if(type === 'image') ext = url.split('.').pop().split('?')[0] || 'jpg';
+    else if(type === 'audio') ext = 'webm';
+    
+    a.download = 'karanka-' + Date.now() + '.' + ext;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(objUrl); }, 1000);
+    
+    // On mobile, most browsers open the file in a new tab if download doesn't work
+    if(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)){
+      window.open(url, '_blank');
+    }
+  } catch(e) {
+    // Fallback: open in new tab
+    window.open(url, '_blank');
+  }
 }
 
 async function deleteMessageForMe(messageId, table, chatField, chatId){
@@ -1534,6 +1597,9 @@ async function deleteMessageForEveryone(messageId, table, chatField, chatId){
   if(table === 'group_messages') loadGroupMessages(chatId);
   else loadMessages(chatId);
 }
+
+
+
 
 
 

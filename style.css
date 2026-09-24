@@ -462,3 +462,13 @@ main{
   color: #e5534b !important;
   border-color: rgba(229,83,75,.6) !important;
 }
+
+/* Unified message menu */
+.msg-menu-btn.save{
+  color: #3ecf6e !important;
+  border-color: rgba(62,207,110,.6) !important;
+}
+.msg-menu-btn.cancel{
+  color: #9699a7 !important;
+  border-color: rgba(150,150,150,.3) !important;
+}
