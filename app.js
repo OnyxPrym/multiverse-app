@@ -1176,3 +1176,10 @@ async function leaveGroup(groupId){
   if(typeof loadGroupList === 'function') loadGroupList();
 }
 
+
+// Ensure group list loads on every page open
+window.addEventListener('load', function(){
+  setTimeout(function(){
+    if(currentUser && typeof loadGroupList === 'function') loadGroupList();
+  }, 500);
+});
