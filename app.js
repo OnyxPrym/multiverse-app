@@ -437,6 +437,8 @@ async function loadMessages(chatId){
   for(const m of (msgs || [])){
     const div = document.createElement('div');
     div.className = 'bubble ' + (m.sender_id === currentUser.id ? 'out' : 'in');
+    div.setAttribute('data-msgid', m.id);
+    div.setAttribute('data-sender', m.sender_id);
 
     if(m.expired){
       div.textContent = 'Photo (expired)';
@@ -1055,11 +1057,25 @@ async function loadGroupMessages(groupId){
     const mine = m.sender_id === currentUser.id;
     const div = document.createElement('div');
     div.className = 'bubble ' + (mine ? 'out' : 'in');
+    div.setAttribute('data-msgid', m.id);
+    div.setAttribute('data-sender', m.sender_id);
+    
+    let body = '';
+    if(m.deleted){ body = '<i style="opacity:.6;">This message was deleted</i>'; }
+    else if(m.image_url){ body = '<img src="' + m.image_url + '" style="max-width:200px;border-radius:10px;display:block;">'; }
+    else if(m.audio_url){ body = '<audio controls src="' + m.audio_url + '" style="max-width:220px;"></audio>'; }
+    else { body = (m.content || ''); }
+    
     if(!mine){
-      div.innerHTML = '<div style="font-size:.68rem;opacity:.7;margin-bottom:2px;"><b>' + senderName + '</b></div>' + (m.content || '') + '<div class="time">' + new Date(m.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) + '</div>';
+      div.innerHTML = '<div style="font-size:.68rem;opacity:.7;margin-bottom:2px;"><b>' + senderName + '</b></div>' + body + '<div class="time">' + new Date(m.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) + '</div>';
     } else {
-      div.innerHTML = (m.content || '') + '<div class="time">' + new Date(m.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) + '</div>';
+      div.innerHTML = body + '<div class="time">' + new Date(m.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) + '</div>';
     }
+    
+    attachLongPress(div, function(){
+      showMessageMenu(m.id, m.sender_id, 'group_messages', 'group_id', groupId);
+    });
+    
     container.appendChild(div);
   });
   container.scrollTop = container.scrollHeight;
@@ -1291,5 +1307,199 @@ initSound();
 
 
 
+
+
+
+
+/* ============================================================
+   GROUP PHOTO + VOICE + DELETE
+   ============================================================ */
+async function sendGroupImage(){
+  const fileInput = document.getElementById('imgInput');
+  const file = fileInput.files[0];
+  if(!file || !activeGroupId){ alert('Select a group first'); fileInput.value=''; return; }
+  
+  const parts = file.name.split('.');
+  const ext = parts.length > 1 ? parts.pop().toLowerCase() : 'jpg';
+  const path = 'groupImages/' + activeGroupId + '/' + Date.now() + '.' + ext;
+  
+  const up = await sb.storage.from('media').upload(path, file);
+  if(up.error){ alert('Upload failed: ' + up.error.message); fileInput.value=''; return; }
+  
+  const url = sb.storage.from('media').getPublicUrl(path).data.publicUrl;
+  
+  const ins = await sb.from('group_messages').insert({
+    group_id: activeGroupId,
+    sender_id: currentUser.id,
+    content: '',
+    image_url: url,
+    storage_path: path
+  });
+  if(ins.error){ alert('Send failed: ' + ins.error.message); fileInput.value=''; return; }
+  fileInput.value = '';
+  loadGroupMessages(activeGroupId);
+}
+
+async function sendImageAuto(){
+  if(window.activeGroupId) return sendGroupImage();
+  return sendImage();
+}
+
+/* ============================================================
+   VOICE NOTES
+   ============================================================ */
+let mediaRecorder = null;
+let recordedChunks = [];
+let recordingTimer = null;
+let recordingStart = 0;
+
+async function startVoiceRecording(){
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    alert('Voice recording is not supported in this browser.'); return;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+    recordedChunks = [];
+    recordingStart = Date.now();
+    
+    mediaRecorder.ondataavailable = function(e){ if(e.data.size > 0) recordedChunks.push(e.data); };
+    mediaRecorder.onstop = async function(){
+      stream.getTracks().forEach(function(t){ t.stop(); });
+      const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+      if(blob.size < 1000){ return; } // too short
+      await uploadVoiceNote(blob);
+    };
+    
+    mediaRecorder.start();
+    
+    // Show a recording indicator
+    let indicator = document.getElementById('voiceIndicator');
+    if(!indicator){
+      indicator = document.createElement('div');
+      indicator.id = 'voiceIndicator';
+      indicator.className = 'voice-indicator';
+      indicator.innerHTML = '<span class="voice-dot"></span><span id="voiceTimer">0:00</span> <button onclick="stopVoiceRecording()">Send</button> <button onclick="cancelVoiceRecording()">Cancel</button>';
+      document.body.appendChild(indicator);
+    }
+    
+    recordingTimer = setInterval(function(){
+      const elapsed = Math.floor((Date.now() - recordingStart) / 1000);
+      const m = Math.floor(elapsed / 60);
+      const s = elapsed % 60;
+      const el = document.getElementById('voiceTimer');
+      if(el) el.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+    }, 500);
+  } catch(e){
+    alert('Microphone access denied. Please allow it in your browser settings.');
+  }
+}
+
+function stopVoiceRecording(){
+  if(mediaRecorder && mediaRecorder.state !== 'inactive'){ mediaRecorder.stop(); }
+  if(recordingTimer){ clearInterval(recordingTimer); recordingTimer = null; }
+  const ind = document.getElementById('voiceIndicator');
+  if(ind) ind.remove();
+}
+
+function cancelVoiceRecording(){
+  if(mediaRecorder){ mediaRecorder.onstop = function(){}; mediaRecorder.stop(); }
+  if(recordingTimer){ clearInterval(recordingTimer); recordingTimer = null; }
+  const ind = document.getElementById('voiceIndicator');
+  if(ind) ind.remove();
+}
+
+async function uploadVoiceNote(blob){
+  const ext = 'webm';
+  let folder, table, idField;
+  if(window.activeGroupId){
+    folder = 'groupVoice/' + window.activeGroupId;
+    table = 'group_messages';
+    idField = 'group_id';
+  } else if(activeChatId){
+    folder = 'voice/' + activeChatId;
+    table = 'messages';
+    idField = 'chat_id';
+  } else { return; }
+  
+  const path = folder + '/' + Date.now() + '.' + ext;
+  const up = await sb.storage.from('media').upload(path, blob, { contentType: 'audio/webm' });
+  if(up.error){ alert('Upload failed: ' + up.error.message); return; }
+  
+  const url = sb.storage.from('media').getPublicUrl(path).data.publicUrl;
+  
+  const row = { sender_id: currentUser.id, content: '', audio_url: url, storage_path: path };
+  row[idField] = window.activeGroupId || activeChatId;
+  
+  const ins = await sb.from(table).insert(row);
+  if(ins.error){ alert('Send failed: ' + ins.error.message); return; }
+  
+  if(window.activeGroupId) loadGroupMessages(window.activeGroupId);
+  else if(activeChatId) loadMessages(activeChatId);
+}
+
+/* ============================================================
+   DELETE MESSAGES — long press
+   ============================================================ */
+function attachLongPress(el, callback){
+  let pressTimer = null;
+  const start = function(e){ 
+    pressTimer = setTimeout(function(){ 
+      if(navigator.vibrate) navigator.vibrate(30);
+      callback(e);
+    }, 600);
+  };
+  const cancel = function(){ if(pressTimer){ clearTimeout(pressTimer); pressTimer = null; } };
+  el.addEventListener('touchstart', start, { passive: true });
+  el.addEventListener('touchend', cancel);
+  el.addEventListener('touchmove', cancel);
+  el.addEventListener('touchcancel', cancel);
+  el.addEventListener('mousedown', start);
+  el.addEventListener('mouseup', cancel);
+  el.addEventListener('mouseleave', cancel);
+}
+
+function showMessageMenu(messageId, senderId, table, chatField, chatId){
+  const isMine = senderId === currentUser.id;
+  const menu = document.createElement('div');
+  menu.className = 'msg-menu';
+  menu.id = 'msgMenu';
+  menu.innerHTML = 
+    '<div class="msg-menu-inner">' +
+    '<button class="msg-menu-btn" data-act="me">Delete for me</button>' +
+    (isMine ? '<button class="msg-menu-btn danger" data-act="all">Delete for everyone</button>' : '') +
+    '<button class="msg-menu-btn" data-act="cancel">Cancel</button>' +
+    '</div>';
+  document.body.appendChild(menu);
+  
+  menu.querySelectorAll('button').forEach(function(b){
+    b.onclick = function(){
+      const act = b.dataset.act;
+      menu.remove();
+      if(act === 'cancel') return;
+      if(act === 'me') deleteMessageForMe(messageId, table, chatField, chatId);
+      if(act === 'all') deleteMessageForEveryone(messageId, table, chatField, chatId);
+    };
+  });
+  setTimeout(function(){
+    document.addEventListener('click', function closeMenu(ev){
+      if(!menu.contains(ev.target)){ menu.remove(); document.removeEventListener('click', closeMenu); }
+    });
+  }, 100);
+}
+
+async function deleteMessageForMe(messageId, table, chatField, chatId){
+  const ins = await sb.from('hidden_messages').insert({ message_id: messageId, user_id: currentUser.id });
+  if(ins.error && ins.error.code !== '23505'){ alert('Failed: ' + ins.error.message); return; }
+  if(table === 'group_messages') loadGroupMessages(chatId);
+  else loadMessages(chatId);
+}
+
+async function deleteMessageForEveryone(messageId, table, chatField, chatId){
+  const upd = await sb.from(table).update({ deleted: true, content: '', image_url: null, audio_url: null }).eq('id', messageId);
+  if(upd.error){ alert('Failed: ' + upd.error.message); return; }
+  if(table === 'group_messages') loadGroupMessages(chatId);
+  else loadMessages(chatId);
+}
 
 

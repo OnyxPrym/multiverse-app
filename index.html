@@ -96,7 +96,8 @@
         <div class="composer">
           <button class="icon-btn" onclick="toggleEmoji()">😊</button>
           <input id="msgInput" type="text" placeholder="Message..." onkeydown="if(event.key==='Enter')sendMsg()">
-          <label class="icon-btn" title="Send photo">📎<input type="file" id="imgInput" accept="image/*" style="display:none" onchange="sendImage()"></label>
+          <button class="icon-btn" id="voiceBtn" title="Voice note" onmousedown="startVoiceRecording()" ontouchstart="startVoiceRecording()">🎤</button>
+          <label class="icon-btn" title="Send photo">📎<input type="file" id="imgInput" accept="image/*" style="display:none" onchange="sendImageAuto()"></label>
           <button class="send-btn" onclick="if(window.activeGroupId){sendGroupMessage()}else{sendMsg()}">➤</button>
           <div class="emoji-panel" id="emojiPanel">
             <div class="emoji-tabs">
@@ -212,6 +213,7 @@
   </div>
 </body>
 </html>
+
 
 
 

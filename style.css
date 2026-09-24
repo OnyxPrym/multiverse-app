@@ -377,3 +377,41 @@ main{
   border-radius:50%;
   object-fit:cover;
 }
+
+/* VOICE INDICATOR */
+.voice-indicator{
+  position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+  background:#1a1a1a;border:1px solid #d4af37;border-radius:30px;
+  padding:10px 18px;display:flex;align-items:center;gap:10px;
+  z-index:9999;color:#fff;font-size:.85rem;
+}
+.voice-dot{
+  width:10px;height:10px;border-radius:50%;background:#e5534b;
+  animation:pulse 1s infinite;
+}
+@keyframes pulse{
+  0%,100%{opacity:1;} 50%{opacity:.3;}
+}
+.voice-indicator button{
+  background:transparent;border:1px solid #d4af37;color:#d4af37;
+  border-radius:14px;padding:4px 10px;font-size:.75rem;cursor:pointer;
+}
+
+/* MESSAGE MENU */
+.msg-menu{
+  position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9998;
+  display:flex;align-items:flex-end;justify-content:center;
+}
+.msg-menu-inner{
+  background:#1a1a1a;border-radius:16px;padding:8px;
+  display:flex;flex-direction:column;gap:4px;
+  margin-bottom:20px;min-width:220px;
+  border:1px solid #d4af37;
+}
+.msg-menu-btn{
+  background:transparent;border:none;color:#fff;
+  padding:12px 18px;border-radius:10px;text-align:left;
+  font-size:.85rem;cursor:pointer;
+}
+.msg-menu-btn:hover{background:rgba(212,175,55,.15);}
+.msg-menu-btn.danger{color:#e5534b;}
