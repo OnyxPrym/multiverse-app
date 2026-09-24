@@ -1105,14 +1105,19 @@ async function openGroupSettings(groupId){
     memberHtml += '<div class="member-row"><div class="member-name">' + name + (isMe ? ' (you)' : '') + '</div><div class="member-role">' + (m.role === 'owner' ? 'Owner' : m.role === 'admin' ? 'Admin' : '') + '</div>' + (isAdmin && m.role !== 'owner' && !isMe ? '<button class="mini-btn" data-promote="' + m.user_id + '">' + (m.role === 'admin' ? 'Demote' : 'Promote') + '</button><button class="mini-btn danger" data-remove="' + m.user_id + '">X</button>' : '') + '</div>';
   });
   const html = '<div class="modal-backdrop show" id="groupSettingsBackdrop"><div class="modal" style="max-width:480px;"><button class="close-x" onclick="closeGroupSettings()">X</button><h2>' + group.name + '</h2>' + (isAdmin ? '<div class="settings-section"><div class="toggle-row"><label>Only admins can post</label><input type="checkbox" ' + (group.admin_only_posting ? 'checked' : '') + ' onchange="updateGroupSetting(\'' + groupId + '\', \'admin_only_posting\', this.checked)"></div><div class="toggle-row"><label>Require approval for new members</label><input type="checkbox" ' + (group.require_approval ? 'checked' : '') + ' onchange="updateGroupSetting(\'' + groupId + '\', \'require_approval\', this.checked)"></div><div class="toggle-row"><label>Enable invite link</label><input type="checkbox" ' + (group.invite_enabled ? 'checked' : '') + ' onchange="updateGroupSetting(\'' + groupId + '\', \'invite_enabled\', this.checked)"></div>' + (group.invite_enabled ? '<div class="invite-row"><input type="text" readonly value="' + (group.invite_token ? window.location.origin + '/?join=' + group.invite_token : 'No token yet') + '" id="inviteLinkInput">' + (group.invite_token ? '<button class="mini-btn" onclick="copyInvite()">Copy</button>' : '<button class="mini-btn" onclick="generateInviteToken(\'' + groupId + '\')">Generate</button>') + '</div>' : '') + '</div>' : '<p style="opacity:.6;font-size:.8rem;padding:8px;">Only admins can change settings.</p>') + '<h3 style="margin-top:16px;">Members</h3><div id="membersList">' + memberHtml + '</div>' + (isAdmin ? '<div class="add-member-section"><input type="text" id="addMemberInput" placeholder="@username to add"><button class="primary-btn" onclick="addMemberToGroup(\'' + groupId + '\')">Add</button></div>' : '') + (isOwner ? '<button class="mini-btn danger" style="margin-top:16px;width:100%;" onclick="deleteGroupForEveryone(\'' + groupId + '\')">Delete Group for Everyone</button>' : '') + '<button class="mini-btn danger" style="margin-top:8px;width:100%;" onclick="leaveGroup(\'' + groupId + '\')">Leave Group</button></div></div>';
-  const wrap = document.getElementById('modal');
+  let wrap = document.getElementById('groupSettingsModal');
+  if(!wrap){
+    wrap = document.createElement('div');
+    wrap.id = 'groupSettingsModal';
+    document.body.appendChild(wrap);
+  }
   wrap.innerHTML = html;
   wrap.classList.remove('hidden');
   wrap.querySelectorAll('[data-promote]').forEach(function(btn){ btn.onclick = function(){ promoteMember(groupId, btn.dataset.promote); }; });
   wrap.querySelectorAll('[data-remove]').forEach(function(btn){ btn.onclick = function(){ removeMember(groupId, btn.dataset.remove); }; });
 }
 
-function closeGroupSettings(){ const w = document.getElementById('modal'); w.classList.add('hidden'); w.innerHTML = ''; }
+function closeGroupSettings(){ const w = document.getElementById('groupSettingsModal'); if(w){ w.classList.add('hidden'); w.innerHTML = ''; } }
 
 async function updateGroupSetting(groupId, field, value){
   const update = {};
@@ -1194,4 +1199,5 @@ window.addEventListener('load', function(){
     if(currentUser && typeof loadGroupList === 'function') loadGroupList();
   }, 500);
 });
+
 
