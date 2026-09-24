@@ -415,3 +415,50 @@ main{
 }
 .msg-menu-btn:hover{background:rgba(212,175,55,.15);}
 .msg-menu-btn.danger{color:#e5534b;}
+
+/* Prevent iOS native long-press menu on messages */
+#messages .bubble,
+#messages .msg,
+#messages > div {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Ensure menu always appears on top */
+.msg-menu{
+  z-index: 99999 !important;
+  position: fixed !important;
+  inset: 0 !important;
+  background: rgba(0,0,0,.6) !important;
+  display: flex !important;
+  align-items: flex-end !important;
+  justify-content: center !important;
+}
+.msg-menu-inner{
+  background: #1a1a1a !important;
+  border-radius: 20px 20px 0 0 !important;
+  padding: 16px !important;
+  width: 100% !important;
+  max-width: 500px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  border-top: 2px solid #d4af37 !important;
+}
+.msg-menu-btn{
+  background: transparent !important;
+  border: 1px solid rgba(212,175,55,.4) !important;
+  color: #fff !important;
+  padding: 14px 18px !important;
+  border-radius: 12px !important;
+  text-align: center !important;
+  font-size: .9rem !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+}
+.msg-menu-btn.danger{
+  color: #e5534b !important;
+  border-color: rgba(229,83,75,.6) !important;
+}

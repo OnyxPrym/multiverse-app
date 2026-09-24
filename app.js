@@ -1443,17 +1443,50 @@ async function uploadVoiceNote(blob){
    ============================================================ */
 function attachLongPress(el, callback){
   let pressTimer = null;
-  const start = function(e){ 
-    pressTimer = setTimeout(function(){ 
+  let longPressFired = false;
+  let startX = 0, startY = 0;
+
+  const start = function(e){
+    longPressFired = false;
+    const touch = e.touches ? e.touches[0] : e;
+    startX = touch.clientX;
+    startY = touch.clientY;
+    pressTimer = setTimeout(function(){
+      longPressFired = true;
       if(navigator.vibrate) navigator.vibrate(30);
       callback(e);
-    }, 600);
+    }, 550);
   };
-  const cancel = function(){ if(pressTimer){ clearTimeout(pressTimer); pressTimer = null; } };
-  el.addEventListener('touchstart', start, { passive: true });
-  el.addEventListener('touchend', cancel);
-  el.addEventListener('touchmove', cancel);
+
+  const cancel = function(){
+    if(pressTimer){ clearTimeout(pressTimer); pressTimer = null; }
+  };
+
+  const move = function(e){
+    if(!pressTimer) return;
+    const touch = e.touches ? e.touches[0] : e;
+    const dx = Math.abs(touch.clientX - startX);
+    const dy = Math.abs(touch.clientY - startY);
+    if(dx > 10 || dy > 10){ cancel(); }
+  };
+
+  // prevent the native context menu / text selection
+  el.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+
+  el.addEventListener('touchstart', function(e){
+    e.preventDefault();
+    start(e);
+  }, { passive: false });
+
+  el.addEventListener('touchend', function(e){
+    if(longPressFired){ e.preventDefault(); }
+    cancel();
+  });
+
+  el.addEventListener('touchmove', move, { passive: true });
   el.addEventListener('touchcancel', cancel);
+
+  // Desktop fallback
   el.addEventListener('mousedown', start);
   el.addEventListener('mouseup', cancel);
   el.addEventListener('mouseleave', cancel);
@@ -1501,5 +1534,6 @@ async function deleteMessageForEveryone(messageId, table, chatField, chatId){
   if(table === 'group_messages') loadGroupMessages(chatId);
   else loadMessages(chatId);
 }
+
 
 
