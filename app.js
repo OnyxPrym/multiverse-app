@@ -1213,7 +1213,7 @@ let notifyAudio = null;
 
 function initSound(){
   try {
-    notifyAudio = new Audio('assets/notify.wav');
+    notifyAudio = new Audio('assets/notify.mp3');
     notifyAudio.preload = 'auto';
     notifyAudio.volume = 0.7;
   } catch(e) {
@@ -1273,6 +1273,7 @@ async function toggleSound(){
 
 // Initialize on load
 initSound();
+
 
 
 
