@@ -408,7 +408,7 @@ async function openChat(chatId, headerNameHint){
     .channel('messages-' + chatId)
     .on('postgres_changes',
         { event: '*', schema: 'public', table: 'messages', filter: 'chat_id=eq.' + chatId },
-        function(){ loadMessages(chatId); })
+        function(payload){ if(payload.new && payload.new.sender_id !== currentUser.id && typeof playBeep === 'function') playBeep(); loadMessages(chatId); })
     .subscribe();
 }
 
@@ -1273,5 +1273,6 @@ async function toggleSound(){
 
 // Initialize on load
 initSound();
+
 
 
