@@ -409,7 +409,7 @@ async function openChat(chatId, headerNameHint){
   if(headerActions) headerActions.style.display = 'flex';
 
   document.getElementById('messages').innerHTML = '';
-  if(messagesChannel){ sb.removeChannel(messagesChannel); messagesChannel = null; }
+  if(messagesChannel){ try { sb.removeChannel(messagesChannel); } catch(e){} messagesChannel = null; }
 
   await loadMessages(chatId);
 
@@ -1101,7 +1101,7 @@ async function loadGroupMessages(groupId){
 }
 
 function subscribeGroupMessages(groupId){
-  if(groupMessagesChannel){ sb.removeChannel(groupMessagesChannel); groupMessagesChannel = null; }
+  if(groupMessagesChannel){ try { sb.removeChannel(groupMessagesChannel); } catch(e){} groupMessagesChannel = null; }
   groupMessagesChannel = sb.channel('group-' + groupId)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages', filter: 'group_id=eq.' + groupId }, function(payload){ if(payload.new && payload.new.sender_id !== currentUser.id && typeof playBeep === 'function') playBeep(); loadGroupMessages(groupId); })
     .subscribe();
@@ -1610,4 +1610,98 @@ async function deleteMessageForEveryone(messageId, table, chatField, chatId){
 
 
 
+
+
+
+/* ============================================================
+   STABILITY — prevent freezing, glitches, duplicate listeners
+   ============================================================ */
+
+// Kill all stray intervals on load (from past debugging)
+(function killStrayIntervals(){
+  const maxId = setInterval(function(){}, 99999999);
+  for(let i = 0; i < maxId; i++){
+    try { clearInterval(i); } catch(e) {}
+  }
+  clearInterval(maxId);
+  console.log('Stray intervals cleared');
+})();
+
+// Global guard: prevent double-loading the same chat
+let loadingChatId = null;
+let loadingGroupId = null;
+
+// Debounce helper for reloads
+const _reloadTimers = {};
+function debouncedReload(key, fn, delay){
+  if(_reloadTimers[key]) clearTimeout(_reloadTimers[key]);
+  _reloadTimers[key] = setTimeout(fn, delay || 300);
+}
+
+// Wrap refreshChatList to prevent it running concurrently
+if(typeof refreshChatList === 'function' && !refreshChatList._wrapped){
+  const _origRefresh = refreshChatList;
+  window.refreshChatList = async function(){
+    if(refreshChatList._running) return;
+    refreshChatList._running = true;
+    try { await _origRefresh.apply(this, arguments); }
+    finally { refreshChatList._running = false; }
+  };
+  window.refreshChatList._wrapped = true;
+}
+
+// Wrap loadMessages to prevent double-load
+if(typeof loadMessages === 'function' && !loadMessages._wrapped){
+  const _origLoad = loadMessages;
+  window.loadMessages = async function(chatId){
+    if(loadingChatId === chatId) return;
+    loadingChatId = chatId;
+    try { await _origLoad.apply(this, arguments); }
+    finally { setTimeout(function(){ loadingChatId = null; }, 200); }
+  };
+  window.loadMessages._wrapped = true;
+}
+
+// Wrap loadGroupMessages
+if(typeof loadGroupMessages === 'function' && !loadGroupMessages._wrapped){
+  const _origLoadG = loadGroupMessages;
+  window.loadGroupMessages = async function(groupId){
+    if(loadingGroupId === groupId) return;
+    loadingGroupId = groupId;
+    try { await _origLoadG.apply(this, arguments); }
+    finally { setTimeout(function(){ loadingGroupId = null; }, 200); }
+  };
+  window.loadGroupMessages._wrapped = true;
+}
+
+// Reload only when tab becomes visible (not on a timer)
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState === 'visible' && currentUser){
+    debouncedReload('visibility', function(){
+      if(typeof refreshChatList === 'function') refreshChatList();
+      if(typeof loadGroupList === 'function') loadGroupList();
+    }, 500);
+  }
+});
+
+// Global error handler — prevents silent crashes
+window.addEventListener('error', function(e){
+  if(e && e.message && e.message.indexOf('ResizeObserver') >= 0) return;
+  console.error('App error (non-fatal):', e.message);
+});
+
+// Unhandled promise rejections — log but don't crash
+window.addEventListener('unhandledrejection', function(e){
+  console.warn('Unhandled promise:', e.reason);
+  e.preventDefault();
+});
+
+// Prevent iOS rubber-band scrolling glitches
+document.addEventListener('touchmove', function(e){
+  if(e.target.closest('.messages, #messages, .sidebar, .modal')) return;
+  if(e.touches.length > 1) return;
+  e.preventDefault();
+}, { passive: false });
+
+console.log('Stability guards loaded');
 
