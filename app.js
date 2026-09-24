@@ -1378,14 +1378,19 @@ async function startVoiceRecording(){
   }
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    mediaRecorder = new MediaRecorder(stream);
+    // Pick the right audio format based on device
+  let mimeType = 'audio/webm';
+  if(MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+  else if(MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mimeType = 'audio/webm;codecs=opus';
+  console.log('Recording format:', mimeType);
+  mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
     recordedChunks = [];
     recordingStart = Date.now();
     
     mediaRecorder.ondataavailable = function(e){ if(e.data.size > 0) recordedChunks.push(e.data); };
     mediaRecorder.onstop = async function(){
       stream.getTracks().forEach(function(t){ t.stop(); });
-      const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+      const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
       if(blob.size < 1000){ return; } // too short
       await uploadVoiceNote(blob);
     };
@@ -1429,7 +1434,7 @@ function cancelVoiceRecording(){
 }
 
 async function uploadVoiceNote(blob){
-  const ext = 'webm';
+  const ext = (blob.type.indexOf('mp4') >= 0) ? 'mp4' : 'webm';
   let folder, table, idField;
   if(window.activeGroupId){
     folder = 'groupVoice/' + window.activeGroupId;
@@ -1597,6 +1602,7 @@ async function deleteMessageForEveryone(messageId, table, chatField, chatId){
   if(table === 'group_messages') loadGroupMessages(chatId);
   else loadMessages(chatId);
 }
+
 
 
 
