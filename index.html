@@ -181,6 +181,12 @@
     <div class="modal" style="max-width:420px;">
       <button class="close-x" onclick="closeGroupModal()">✕</button>
       <h2>Create Group</h2>
+      <div style="text-align:center;margin-bottom:12px;">
+        <img id="groupLogoPreview" src="assets/logo.png" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid #d4af37;">
+        <div style="margin-top:6px;">
+          <label class="mini-btn" style="cursor:pointer;display:inline-block;">Add Logo<input type="file" accept="image/*" style="display:none" onchange="previewGroupLogo(this)"></label>
+        </div>
+      </div>
       <div class="field">
         <label>Group name</label>
         <input type="text" id="groupNameInput" placeholder="e.g. Weekend Crew">
@@ -202,6 +208,7 @@
   </div>
 </body>
 </html>
+
 
 
 

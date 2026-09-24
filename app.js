@@ -993,9 +993,13 @@ async function loadGroupList(){
 /* ============================================================
    GROUP CHAT — full feature
    ============================================================ */
+/* ============================================================
+   GROUP v2 — full feature set
+   ============================================================ */
 let activeGroupId = null;
 let activeGroupName = null;
 let groupMessagesChannel = null;
+let groupLogoDataUrl = null;
 
 async function openGroupChat(groupId, groupName){
   closeSidebar();
@@ -1025,7 +1029,7 @@ async function loadGroupMessages(groupId){
   const res = await sb.from('group_messages').select('*').eq('group_id', groupId).order('created_at', { ascending: true });
   if(res.error){ container.innerHTML = '<div style="padding:12px;color:#e5534b;">Error: ' + res.error.message + '</div>'; return; }
   const msgs = res.data || [];
-  if(msgs.length === 0){ container.innerHTML = '<div style="padding:20px;text-align:center;opacity:.5;font-size:.8rem;">No messages yet.</div>'; return; }
+  if(msgs.length === 0){ container.innerHTML = '<div style="padding:20px;text-align:center;opacity:.5;font-size:.8rem;">No messages yet. Say hi 👋</div>'; return; }
   const uids = [];
   msgs.forEach(function(m){ if(uids.indexOf(m.sender_id) < 0) uids.push(m.sender_id); });
   const profRes = await sb.from('profiles').select('id, display_name, username, business_name').in('id', uids);
@@ -1069,6 +1073,18 @@ async function sendGroupMessage(){
   loadGroupMessages(activeGroupId);
 }
 
+function previewGroupLogo(input){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    groupLogoDataUrl = e.target.result;
+    const preview = document.getElementById('groupLogoPreview');
+    if(preview) preview.src = groupLogoDataUrl;
+  };
+  reader.readAsDataURL(file);
+}
+
 async function openGroupSettings(groupId){
   const gRes = await sb.from('groups').select('*').eq('id', groupId).single();
   if(gRes.error){ alert('Could not load group: ' + gRes.error.message); return; }
@@ -1079,34 +1095,16 @@ async function openGroupSettings(groupId){
   const profRes = await sb.from('profiles').select('id, display_name, username, business_name').in('id', memberUids);
   const pmap = {};
   (profRes.data || []).forEach(function(p){ pmap[p.id] = p; });
+  const isOwner = members.some(function(m){ return m.user_id === currentUser.id && m.role === 'owner'; });
   const isAdmin = members.some(function(m){ return m.user_id === currentUser.id && (m.role === 'owner' || m.role === 'admin'); });
   let memberHtml = '';
   members.forEach(function(m){
     const p = pmap[m.user_id] || {};
     const name = p.display_name || p.username || p.business_name || 'Unknown';
     const isMe = m.user_id === currentUser.id;
-    memberHtml += '<div class="member-row">' +
-      '<div class="member-name">' + name + (isMe ? ' (you)' : '') + '</div>' +
-      '<div class="member-role">' + (m.role === 'owner' ? 'Owner' : m.role === 'admin' ? 'Admin' : '') + '</div>' +
-      (isAdmin && m.role !== 'owner' && !isMe ? '<button class="mini-btn" data-promote="' + m.user_id + '">' + (m.role === 'admin' ? 'Demote' : 'Promote') + '</button><button class="mini-btn danger" data-remove="' + m.user_id + '">X</button>' : '') +
-      '</div>';
+    memberHtml += '<div class="member-row"><div class="member-name">' + name + (isMe ? ' (you)' : '') + '</div><div class="member-role">' + (m.role === 'owner' ? 'Owner' : m.role === 'admin' ? 'Admin' : '') + '</div>' + (isAdmin && m.role !== 'owner' && !isMe ? '<button class="mini-btn" data-promote="' + m.user_id + '">' + (m.role === 'admin' ? 'Demote' : 'Promote') + '</button><button class="mini-btn danger" data-remove="' + m.user_id + '">X</button>' : '') + '</div>';
   });
-  const html = '<div class="modal-backdrop show" id="groupSettingsBackdrop"><div class="modal" style="max-width:480px;">' +
-    '<button class="close-x" onclick="closeGroupSettings()">X</button>' +
-    '<h2>' + group.name + '</h2>' +
-    (isAdmin ?
-      '<div class="settings-section">' +
-        '<div class="toggle-row"><label>Only admins can post</label><input type="checkbox" ' + (group.admin_only_posting ? 'checked' : '') + ' onchange="updateGroupSetting(\'' + groupId + '\', \'admin_only_posting\', this.checked)"></div>' +
-        '<div class="toggle-row"><label>Require approval for new members</label><input type="checkbox" ' + (group.require_approval ? 'checked' : '') + ' onchange="updateGroupSetting(\'' + groupId + '\', \'require_approval\', this.checked)"></div>' +
-        '<div class="toggle-row"><label>Enable invite link</label><input type="checkbox" ' + (group.invite_enabled ? 'checked' : '') + ' onchange="updateGroupSetting(\'' + groupId + '\', \'invite_enabled\', this.checked)"></div>' +
-        (group.invite_enabled ? '<div class="invite-row"><input type="text" readonly value="' + (group.invite_token ? window.location.origin + '/?join=' + group.invite_token : 'No token yet') + '" id="inviteLinkInput">' + (group.invite_token ? '<button class="mini-btn" onclick="copyInvite()">Copy</button>' : '<button class="mini-btn" onclick="generateInviteToken(\'' + groupId + '\')">Generate</button>') + '</div>' : '') +
-      '</div>' :
-      '<p style="opacity:.6;font-size:.8rem;padding:8px;">Only admins can change settings.</p>') +
-    '<h3 style="margin-top:16px;">Members</h3>' +
-    '<div id="membersList">' + memberHtml + '</div>' +
-    (isAdmin ? '<div class="add-member-section"><input type="text" id="addMemberInput" placeholder="@username"><button class="primary-btn" onclick="addMemberToGroup(\'' + groupId + '\')">Add</button></div>' : '') +
-    '<button class="mini-btn danger" style="margin-top:16px;width:100%;" onclick="leaveGroup(\'' + groupId + '\')">Leave Group</button>' +
-    '</div></div>';
+  const html = '<div class="modal-backdrop show" id="groupSettingsBackdrop"><div class="modal" style="max-width:480px;"><button class="close-x" onclick="closeGroupSettings()">X</button><h2>' + group.name + '</h2>' + (isAdmin ? '<div class="settings-section"><div class="toggle-row"><label>Only admins can post</label><input type="checkbox" ' + (group.admin_only_posting ? 'checked' : '') + ' onchange="updateGroupSetting(\'' + groupId + '\', \'admin_only_posting\', this.checked)"></div><div class="toggle-row"><label>Require approval for new members</label><input type="checkbox" ' + (group.require_approval ? 'checked' : '') + ' onchange="updateGroupSetting(\'' + groupId + '\', \'require_approval\', this.checked)"></div><div class="toggle-row"><label>Enable invite link</label><input type="checkbox" ' + (group.invite_enabled ? 'checked' : '') + ' onchange="updateGroupSetting(\'' + groupId + '\', \'invite_enabled\', this.checked)"></div>' + (group.invite_enabled ? '<div class="invite-row"><input type="text" readonly value="' + (group.invite_token ? window.location.origin + '/?join=' + group.invite_token : 'No token yet') + '" id="inviteLinkInput">' + (group.invite_token ? '<button class="mini-btn" onclick="copyInvite()">Copy</button>' : '<button class="mini-btn" onclick="generateInviteToken(\'' + groupId + '\')">Generate</button>') + '</div>' : '') + '</div>' : '<p style="opacity:.6;font-size:.8rem;padding:8px;">Only admins can change settings.</p>') + '<h3 style="margin-top:16px;">Members</h3><div id="membersList">' + memberHtml + '</div>' + (isAdmin ? '<div class="add-member-section"><input type="text" id="addMemberInput" placeholder="@username to add"><button class="primary-btn" onclick="addMemberToGroup(\'' + groupId + '\')">Add</button></div>' : '') + (isOwner ? '<button class="mini-btn danger" style="margin-top:16px;width:100%;" onclick="deleteGroupForEveryone(\'' + groupId + '\')">Delete Group for Everyone</button>' : '') + '<button class="mini-btn danger" style="margin-top:8px;width:100%;" onclick="leaveGroup(\'' + groupId + '\')">Leave Group</button></div></div>';
   const wrap = document.getElementById('modal');
   wrap.innerHTML = html;
   wrap.classList.remove('hidden');
@@ -1176,6 +1174,19 @@ async function leaveGroup(groupId){
   if(typeof loadGroupList === 'function') loadGroupList();
 }
 
+async function deleteGroupForEveryone(groupId){
+  if(!confirm('Delete this group for ALL members? This cannot be undone.')) return;
+  const res = await sb.from('groups').delete().eq('id', groupId);
+  if(res.error){ alert('Failed: ' + res.error.message); return; }
+  closeGroupSettings();
+  activeGroupId = null;
+  document.getElementById('chatHeaderName').textContent = 'Select or start a chat';
+  const sb2 = document.getElementById('groupSettingsBtn');
+  if(sb2) sb2.style.display = 'none';
+  if(typeof loadGroupList === 'function') loadGroupList();
+}
+
+
 
 // Ensure group list loads on every page open
 window.addEventListener('load', function(){
@@ -1183,3 +1194,4 @@ window.addEventListener('load', function(){
     if(currentUser && typeof loadGroupList === 'function') loadGroupList();
   }, 500);
 });
+
