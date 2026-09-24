@@ -355,3 +355,17 @@ main{
 }
 .group-row .gname{font-weight:600;font-size:.85rem;}
 .group-row .gmeta{font-size:.65rem;opacity:.6;}
+
+/* GROUP SETTINGS */
+.settings-section{background:rgba(212,175,55,.06);border:1px solid rgba(212,175,55,.2);border-radius:12px;padding:12px;margin:12px 0;}
+.toggle-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;font-size:.82rem;border-bottom:1px solid rgba(150,150,150,.1);}
+.toggle-row:last-child{border-bottom:none;}
+.toggle-row label{cursor:pointer;}
+.toggle-row input[type="checkbox"]{width:20px;height:20px;accent-color:#d4af37;cursor:pointer;}
+.invite-row{display:flex;gap:6px;margin-top:8px;}
+.invite-row input{flex:1;padding:8px;border-radius:8px;border:1px solid rgba(212,175,55,.3);background:rgba(150,150,150,.1);color:inherit;font-size:.72rem;}
+.member-row{display:flex;align-items:center;gap:6px;padding:8px 4px;border-bottom:1px solid rgba(150,150,150,.1);font-size:.8rem;}
+.member-name{flex:1;font-weight:600;}
+.member-role{font-size:.68rem;opacity:.7;}
+.add-member-section{display:flex;gap:6px;margin-top:12px;}
+.add-member-section input{flex:1;padding:10px;border-radius:10px;border:1px solid rgba(212,175,55,.3);background:rgba(150,150,150,.1);color:inherit;font-size:.8rem;}

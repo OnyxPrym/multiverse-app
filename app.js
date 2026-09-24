@@ -988,3 +988,191 @@ async function loadGroupList(){
 
 
 
+
+
+/* ============================================================
+   GROUP CHAT — full feature
+   ============================================================ */
+let activeGroupId = null;
+let activeGroupName = null;
+let groupMessagesChannel = null;
+
+async function openGroupChat(groupId, groupName){
+  closeSidebar();
+  activeGroupId = groupId;
+  activeGroupName = groupName;
+  document.getElementById('chatHeaderName').textContent = groupName;
+  const header = document.getElementById('chatHeader');
+  let settingsBtn = document.getElementById('groupSettingsBtn');
+  if(!settingsBtn){
+    settingsBtn = document.createElement('button');
+    settingsBtn.id = 'groupSettingsBtn';
+    settingsBtn.className = 'icon-btn';
+    settingsBtn.style.marginLeft = 'auto';
+    settingsBtn.textContent = 'S';
+    settingsBtn.title = 'Group settings';
+    settingsBtn.onclick = function(){ openGroupSettings(groupId); };
+    header.appendChild(settingsBtn);
+  }
+  settingsBtn.style.display = 'inline-block';
+  await loadGroupMessages(groupId);
+  subscribeGroupMessages(groupId);
+}
+
+async function loadGroupMessages(groupId){
+  const container = document.getElementById('messages');
+  if(!container) return;
+  const res = await sb.from('group_messages').select('*').eq('group_id', groupId).order('created_at', { ascending: true });
+  if(res.error){ container.innerHTML = '<div style="padding:12px;color:#e5534b;">Error: ' + res.error.message + '</div>'; return; }
+  const msgs = res.data || [];
+  if(msgs.length === 0){ container.innerHTML = '<div style="padding:20px;text-align:center;opacity:.5;font-size:.8rem;">No messages yet.</div>'; return; }
+  const uids = [];
+  msgs.forEach(function(m){ if(uids.indexOf(m.sender_id) < 0) uids.push(m.sender_id); });
+  const profRes = await sb.from('profiles').select('id, display_name, username, business_name').in('id', uids);
+  const pmap = {};
+  (profRes.data || []).forEach(function(p){ pmap[p.id] = p; });
+  container.innerHTML = '';
+  msgs.forEach(function(m){
+    const p = pmap[m.sender_id] || {};
+    const senderName = p.display_name || p.username || p.business_name || 'User';
+    const mine = m.sender_id === currentUser.id;
+    const div = document.createElement('div');
+    div.className = 'bubble ' + (mine ? 'out' : 'in');
+    if(!mine){
+      div.innerHTML = '<div style="font-size:.68rem;opacity:.7;margin-bottom:2px;"><b>' + senderName + '</b></div>' + (m.content || '') + '<div class="time">' + new Date(m.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) + '</div>';
+    } else {
+      div.innerHTML = (m.content || '') + '<div class="time">' + new Date(m.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) + '</div>';
+    }
+    container.appendChild(div);
+  });
+  container.scrollTop = container.scrollHeight;
+}
+
+function subscribeGroupMessages(groupId){
+  if(groupMessagesChannel){ sb.removeChannel(groupMessagesChannel); groupMessagesChannel = null; }
+  groupMessagesChannel = sb.channel('group-' + groupId)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages', filter: 'group_id=eq.' + groupId }, function(){ loadGroupMessages(groupId); })
+    .subscribe();
+}
+
+async function sendGroupMessage(){
+  const input = document.getElementById('msgInput');
+  const content = input.value.trim();
+  if(!content || !activeGroupId) return;
+  input.value = '';
+  const res = await sb.from('group_messages').insert({ group_id: activeGroupId, sender_id: currentUser.id, content: content });
+  if(res.error){
+    if(res.error.message.indexOf('policy') >= 0) alert('Only admins can post in this group.');
+    else alert('Could not send: ' + res.error.message);
+    return;
+  }
+  loadGroupMessages(activeGroupId);
+}
+
+async function openGroupSettings(groupId){
+  const gRes = await sb.from('groups').select('*').eq('id', groupId).single();
+  if(gRes.error){ alert('Could not load group: ' + gRes.error.message); return; }
+  const group = gRes.data;
+  const memRes = await sb.from('group_members').select('user_id, role, status').eq('group_id', groupId);
+  const members = memRes.data || [];
+  const memberUids = members.map(function(m){ return m.user_id; });
+  const profRes = await sb.from('profiles').select('id, display_name, username, business_name').in('id', memberUids);
+  const pmap = {};
+  (profRes.data || []).forEach(function(p){ pmap[p.id] = p; });
+  const isAdmin = members.some(function(m){ return m.user_id === currentUser.id && (m.role === 'owner' || m.role === 'admin'); });
+  let memberHtml = '';
+  members.forEach(function(m){
+    const p = pmap[m.user_id] || {};
+    const name = p.display_name || p.username || p.business_name || 'Unknown';
+    const isMe = m.user_id === currentUser.id;
+    memberHtml += '<div class="member-row">' +
+      '<div class="member-name">' + name + (isMe ? ' (you)' : '') + '</div>' +
+      '<div class="member-role">' + (m.role === 'owner' ? 'Owner' : m.role === 'admin' ? 'Admin' : '') + '</div>' +
+      (isAdmin && m.role !== 'owner' && !isMe ? '<button class="mini-btn" data-promote="' + m.user_id + '">' + (m.role === 'admin' ? 'Demote' : 'Promote') + '</button><button class="mini-btn danger" data-remove="' + m.user_id + '">X</button>' : '') +
+      '</div>';
+  });
+  const html = '<div class="modal-backdrop show" id="groupSettingsBackdrop"><div class="modal" style="max-width:480px;">' +
+    '<button class="close-x" onclick="closeGroupSettings()">X</button>' +
+    '<h2>' + group.name + '</h2>' +
+    (isAdmin ?
+      '<div class="settings-section">' +
+        '<div class="toggle-row"><label>Only admins can post</label><input type="checkbox" ' + (group.admin_only_posting ? 'checked' : '') + ' onchange="updateGroupSetting(\'' + groupId + '\', \'admin_only_posting\', this.checked)"></div>' +
+        '<div class="toggle-row"><label>Require approval for new members</label><input type="checkbox" ' + (group.require_approval ? 'checked' : '') + ' onchange="updateGroupSetting(\'' + groupId + '\', \'require_approval\', this.checked)"></div>' +
+        '<div class="toggle-row"><label>Enable invite link</label><input type="checkbox" ' + (group.invite_enabled ? 'checked' : '') + ' onchange="updateGroupSetting(\'' + groupId + '\', \'invite_enabled\', this.checked)"></div>' +
+        (group.invite_enabled ? '<div class="invite-row"><input type="text" readonly value="' + (group.invite_token ? window.location.origin + '/?join=' + group.invite_token : 'No token yet') + '" id="inviteLinkInput">' + (group.invite_token ? '<button class="mini-btn" onclick="copyInvite()">Copy</button>' : '<button class="mini-btn" onclick="generateInviteToken(\'' + groupId + '\')">Generate</button>') + '</div>' : '') +
+      '</div>' :
+      '<p style="opacity:.6;font-size:.8rem;padding:8px;">Only admins can change settings.</p>') +
+    '<h3 style="margin-top:16px;">Members</h3>' +
+    '<div id="membersList">' + memberHtml + '</div>' +
+    (isAdmin ? '<div class="add-member-section"><input type="text" id="addMemberInput" placeholder="@username"><button class="primary-btn" onclick="addMemberToGroup(\'' + groupId + '\')">Add</button></div>' : '') +
+    '<button class="mini-btn danger" style="margin-top:16px;width:100%;" onclick="leaveGroup(\'' + groupId + '\')">Leave Group</button>' +
+    '</div></div>';
+  const wrap = document.getElementById('modal');
+  wrap.innerHTML = html;
+  wrap.classList.remove('hidden');
+  wrap.querySelectorAll('[data-promote]').forEach(function(btn){ btn.onclick = function(){ promoteMember(groupId, btn.dataset.promote); }; });
+  wrap.querySelectorAll('[data-remove]').forEach(function(btn){ btn.onclick = function(){ removeMember(groupId, btn.dataset.remove); }; });
+}
+
+function closeGroupSettings(){ const w = document.getElementById('modal'); w.classList.add('hidden'); w.innerHTML = ''; }
+
+async function updateGroupSetting(groupId, field, value){
+  const update = {};
+  update[field] = value;
+  const res = await sb.from('groups').update(update).eq('id', groupId);
+  if(res.error){ alert('Update failed: ' + res.error.message); return; }
+  if(field === 'invite_enabled' && value === true) openGroupSettings(groupId);
+}
+
+async function generateInviteToken(groupId){
+  const token = Math.random().toString(36).substring(2, 12);
+  const res = await sb.from('groups').update({ invite_token: token }).eq('id', groupId);
+  if(res.error){ alert('Could not generate: ' + res.error.message); return; }
+  openGroupSettings(groupId);
+}
+
+function copyInvite(){ const i = document.getElementById('inviteLinkInput'); if(i){ i.select(); document.execCommand('copy'); alert('Copied!'); } }
+
+async function promoteMember(groupId, userId){
+  const res = await sb.from('group_members').select('role').eq('group_id', groupId).eq('user_id', userId).single();
+  if(res.error){ alert(res.error.message); return; }
+  const newRole = res.data.role === 'admin' ? 'member' : 'admin';
+  const upd = await sb.from('group_members').update({ role: newRole }).eq('group_id', groupId).eq('user_id', userId);
+  if(upd.error){ alert('Failed: ' + upd.error.message); return; }
+  openGroupSettings(groupId);
+}
+
+async function removeMember(groupId, userId){
+  if(!confirm('Remove this member?')) return;
+  const res = await sb.from('group_members').delete().eq('group_id', groupId).eq('user_id', userId);
+  if(res.error){ alert('Failed: ' + res.error.message); return; }
+  openGroupSettings(groupId);
+}
+
+async function addMemberToGroup(groupId){
+  const raw = document.getElementById('addMemberInput').value.trim().toLowerCase().replace('@','');
+  if(!raw) return;
+  const nameRes = await sb.from('names').select('uid').eq('name', raw).maybeSingle();
+  if(nameRes.error || !nameRes.data){ alert('User not found'); return; }
+  const otherUid = nameRes.data.uid;
+  const groupRes = await sb.from('groups').select('require_approval').eq('id', groupId).single();
+  const needsApproval = groupRes.data && groupRes.data.require_approval;
+  const insRes = await sb.from('group_members').insert({ group_id: groupId, user_id: otherUid, role: 'member', status: needsApproval ? 'pending' : 'active' });
+  if(insRes.error){ alert('Failed: ' + insRes.error.message); return; }
+  alert('Added' + (needsApproval ? ' (pending approval)' : ''));
+  openGroupSettings(groupId);
+}
+
+async function leaveGroup(groupId){
+  if(!confirm('Leave this group?')) return;
+  const res = await sb.from('group_members').delete().eq('group_id', groupId).eq('user_id', currentUser.id);
+  if(res.error){ alert('Failed: ' + res.error.message); return; }
+  closeGroupSettings();
+  activeGroupId = null;
+  document.getElementById('chatHeaderName').textContent = 'Select or start a chat';
+  const sb2 = document.getElementById('groupSettingsBtn');
+  if(sb2) sb2.style.display = 'none';
+  if(typeof refreshChatList === 'function') refreshChatList();
+  if(typeof loadGroupList === 'function') loadGroupList();
+}
+
