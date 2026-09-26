@@ -156,6 +156,7 @@ async function setTheme(t, persist){
 }
 
 function openProfile(){
+  if(typeof loadProfilePicIntoModal === 'function') loadProfilePicIntoModal();
   document.getElementById('profileDisplayName').value = currentProfile.display_name || '';
   document.getElementById('profileUsername').value =
     '@' + (currentProfile.username || currentProfile.business_name || '');
@@ -1704,4 +1705,5 @@ document.addEventListener('touchmove', function(e){
 }, { passive: false });
 
 console.log('Stability guards loaded');
+
 

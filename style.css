@@ -472,3 +472,90 @@ main{
   color: #9699a7 !important;
   border-color: rgba(150,150,150,.3) !important;
 }
+
+
+/* ============================================================
+   ANTI-ZOOM — prevents iOS from zooming in/out
+   ============================================================ */
+html {
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  touch-action: manipulation;
+  overflow-x: hidden;
+}
+
+body {
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* ALL inputs and textareas must be 16px or larger — iOS auto-zooms below that */
+input,
+textarea,
+select,
+button {
+  font-size: 16px !important;
+  touch-action: manipulation;
+}
+
+/* Keep chat input visually smaller but 16px internally to prevent zoom */
+.composer input[type="text"],
+.composer textarea,
+#msgInput {
+  font-size: 16px !important;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* Auth inputs */
+.auth input,
+.field input {
+  font-size: 16px !important;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* Prevent double-tap zoom on all tappable elements */
+button,
+a,
+label,
+.bubble,
+.msg,
+.contact,
+.item,
+.nav-item,
+.icon-btn {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Ensure body never exceeds viewport width */
+* {
+  max-width: 100%;
+}
+* {
+  box-sizing: border-box;
+}
+
+/* Prevent horizontal scroll */
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
+}
+
+/* Fix for iOS keyboard pushing content */
+@supports (-webkit-touch-callout: none){
+  .app-screen,
+  body,
+  html {
+    height: -webkit-fill-available;
+  }
+  .app-screen {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
+}
